@@ -1,93 +1,108 @@
 import React, { useState } from 'react';
+import { Instagram, Twitter, Facebook, Youtube } from "lucide-react";
 import { Link, useLocation } from 'react-router-dom';
 import { Scale, Menu, X, Gavel, FileText, Search, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './LanguageSwitcher';
-
+ 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
   const { t } = useTranslation();
+ 
+const navLinks = [
+  { name: "Drafting", path: '/generate', icon: FileText },
+  { name: "Legal Guidance", path: '/guidance', icon: Gavel },
 
-  const navLinks = [
-    { name: t('common.home'), path: '/', icon: Scale },
-    { name: t('common.complaintGenerator'), path: '/generate', icon: FileText },
-    { name: t('common.legalGuidance'), path: '/guidance', icon: Gavel },
-    { name: t('common.caseResearch'), path: '/research', icon: Search },
-    { name: t('common.about'), path: '/about', icon: Info },
-  ];
+  // 🔥 MAIN FIX
+  { name: " Legal Research", path: '/research', icon: Search },
 
+  { name: "My Dashboard", path: '/dashboard', icon: Scale },
+  { name: "About us", path: '/about', icon: Info },
+];
+ 
   return (
-    <nav className="bg-white border-b border-gray-100 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center flex-shrink-0">
-            <Link to="/" className="flex items-center space-x-1.5 sm:space-x-2">
-              <div className="bg-saffron p-1 sm:p-1.5 rounded-lg">
-                <Scale className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-              </div>
-              <span className="text-lg sm:text-xl font-bold text-navy tracking-tight">PocketLawyer</span>
-            </Link>
-          </div>
-
-          {/* Desktop Menu */}
-          <div className="hidden md:flex items-center space-x-4">
+    <nav className="sticky top-0 z-50 px-4 w-full">
+      <div className="max-w-5xl mx-auto">
+ 
+        {/* Pill — logo + links + button sab iske andar */}
+        <div className="flex justify-between items-center bg-white/95 backdrop-blur-sm border border-gray-200 shadow-sm rounded-full px-6 py-2.5">
+ 
+          {/* Logo */}
+          <Link to="/" className="flex items-center space-x-2 flex-shrink-0">
+            <img
+              src="/hero3.png"
+              alt="logo"
+              className="h-8 w-8 object-contain"
+            />
+            <span className="text-lg font-bold text-orange-500 tracking-tight">
+              Pocketlawyer
+            </span>
+          </Link>
+ 
+          {/* Desktop links */}
+          <div className="hidden md:flex items-center space-x-1">
             {navLinks.map((link) => (
               <Link
                 key={link.name}
                 to={link.path}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   location.pathname === link.path
-                    ? 'text-saffron bg-saffron/5'
-                    : 'text-navy/70 hover:text-saffron hover:bg-gray-50'
+                    ? 'text-gray-900 bg-gray-100'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                 }`}
               >
                 {link.name}
               </Link>
             ))}
-            <div className="ml-2">
+          </div>
+ 
+          {/* Right side — language + button */}
+          <div className="hidden md:flex items-center space-x-3">
+            <div className="text-gray-600 text-sm">
               <LanguageSwitcher />
             </div>
             <Link
-              to="/generate"
-              className="ml-4 bg-saffron text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-orange-600 transition-all shadow-sm"
+              to="/research"
+              className="bg-gray-900 text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-gray-700 transition-all"
             >
-              {t('common.getStarted')}
+            Start Your Case ⚡
             </Link>
           </div>
-
+ 
           {/* Mobile menu button */}
-          <div className="md:hidden flex items-center space-x-1 sm:space-x-2">
+          <div className="md:hidden flex items-center space-x-2">
             <LanguageSwitcher />
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="text-navy p-1.5 sm:p-2 rounded-md hover:bg-gray-100"
+              className="text-gray-600 p-2 rounded-full hover:bg-gray-100"
             >
-              {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
           </div>
+ 
         </div>
       </div>
-
-      {/* Mobile Menu */}
+ 
+      {/* Mobile dropdown */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-white border-b border-gray-100 overflow-hidden"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="md:hidden max-w-5xl mx-auto mt-2 bg-white border border-gray-200 rounded-2xl shadow-md overflow-hidden"
           >
-            <div className="px-2 pt-2 pb-3 space-y-1">
+            <div className="px-3 py-2 space-y-1">
               {navLinks.map((link) => (
                 <Link
                   key={link.name}
                   to={link.path}
                   onClick={() => setIsOpen(false)}
-                  className="flex items-center space-x-3 px-3 py-3 rounded-md text-base font-medium text-navy hover:bg-gray-50 hover:text-saffron"
+                  className="flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
-                  <link.icon className="h-5 w-5" />
+                  <link.icon className="h-4 w-4 text-gray-400" />
                   <span>{link.name}</span>
                 </Link>
               ))}
@@ -98,28 +113,57 @@ export const Navbar = () => {
     </nav>
   );
 };
-
+ 
 export const Footer = () => {
   const { t } = useTranslation();
   return (
     <footer className="bg-navy text-white pt-12 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-          <div className="col-span-1 md:col-span-2">
-            <div className="flex items-center space-x-2 mb-4">
-              <Scale className="h-6 w-6 text-saffron" />
-              <span className="text-xl font-bold tracking-tight">PocketLawyer</span>
-            </div>
-            <p className="text-gray-400 max-w-sm">
-              {t('common.disclaimer').split(':')[0]}: {t('common.disclaimer').split(':')[1]}
-            </p>
-          </div>
+         <div className="col-span-1 md:col-span-2 space-y-5">
+
+  {/* Company Name */}
+  <h2 className="text-2xl font-semibold tracking-[3px] text-white uppercase">
+    PocketLawyer is a product of the parent company Xpertik Pvt Ltd
+  </h2>
+
+  {/* Social Icons */}
+  <div className="flex gap-4 text-gray-300">
+    <a href="https://www.instagram.com/pocket.lawyer?igsh=YTQ3cXBlZWp4N29q" target="_blank">
+      <Instagram className="hover:text-orange-400 transition hover:scale-110" />
+    </a>
+    <a href="https://x.com/PocketlawyerInc" target="_blank">
+      <Twitter className="hover:text-orange-400 transition hover:scale-110" />
+    </a>
+    <a href="https://www.facebook.com/share/1CQNMH1Rrx/" target="_blank">
+      <Facebook className="hover:text-orange-400 transition hover:scale-110" />
+    </a>
+    <a href="#" target="_blank">
+      <Youtube className="hover:text-orange-400 transition hover:scale-110" />
+    </a>
+  </div>
+
+  {/* Tagline */}
+  <p className="text-sm text-gray-400 max-w-xs leading-relaxed">
+    Empowering AI-driven legal solutions for citizens and lawyers across India.
+  </p>
+
+  {/* Logo */}
+  <div>
+   <img
+  src="/xpertik-logo.png"
+  alt="Xpertik"
+  className="w-32 opacity-100"
+/>
+  </div>
+
+</div>
           <div>
             <h3 className="text-lg font-semibold mb-4 text-saffron">{t('common.quickLinks')}</h3>
             <ul className="space-y-2 text-gray-400">
               <li><Link to="/" className="hover:text-white transition-colors">{t('common.home')}</Link></li>
               <li><Link to="/generate" className="hover:text-white transition-colors">{t('common.complaintGenerator')}</Link></li>
-              <li><Link to="/guidance" className="hover:text-white transition-colors">{t('common.legalGuidance')}</Link></li>
+              <li><Link to="/case-research" className="hover:text-white transition-colors">{t('common.legalGuidance')}</Link></li>
               <li><Link to="/research" className="hover:text-white transition-colors">{t('common.caseResearch')}</Link></li>
             </ul>
           </div>

@@ -1,0 +1,49 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Function to check if the document belongs to the authenticated user
+    function isOwner() {
+      return request.auth != null && resource.data.userId == request.auth.uid;
+    }
+    
+    // Function to check if the new document being created belongs to the authenticated user
+    function isOwnerCreate() {
+      return request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
+    match /cases/{caseId} {
+      allow create: if isOwnerCreate();
+      allow read, update, delete: if isOwner();
+    }
+    match /clients/{clientId} {
+      allow create: if isOwnerCreate();
+      allow read, update, delete: if isOwner();
+    }
+    match /hearings/{hearingId} {
+      allow create: if isOwnerCreate();
+      allow read, update, delete: if isOwner();
+    }
+    match /documents/{documentId} {
+      allow create: if isOwnerCreate();
+      allow read, update, delete: if isOwner();
+    }
+    match /evidence/{evidenceId} {
+      allow create: if isOwnerCreate();
+      allow read, update, delete: if isOwner();
+    }
+    match /vaultItems/{vaultItemId} {
+      allow create: if isOwnerCreate();
+      allow read, update, delete: if isOwner();
+    }
+    match /aiChats/{chatId} {
+      allow create: if isOwnerCreate();
+      allow read, update, delete: if isOwner();
+    }
+    match /researchSessions/{sessionId} {
+      allow create: if isOwnerCreate();
+      allow read, update, delete: if isOwner();
+    }
+  }
+}

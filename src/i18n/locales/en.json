@@ -1,10 +1,10 @@
 {
   "common": {
     "home": "Home",
-    "complaintGenerator": "Complaint Generator",
-    "legalGuidance": "Legal Guidance",
-    "caseResearch": "Case Research",
-    "about": "About",
+    "complaintGenerator": "Draft Ai",
+    "legalGuidance": "Legal Guidance ",
+    "caseResearch": "Your Dashbord",
+    "about": "About us",
     "getStarted": "Get Started",
     "search": "Search",
     "copyright": "All rights reserved.",
@@ -15,55 +15,56 @@
     "location": "New Delhi, India"
   },
   "landing": {
-    "hero": {
-      "badge": "🇮🇳 Empowering Indian Citizens",
-      "headline": "PocketLawyer – Your AI Legal Assistant in Your Pocket",
-      "subheadline": "Generate legal complaints, understand complex laws, and research court cases instantly using advanced AI.",
-      "ctaGenerate": "Generate Complaint",
-      "ctaGuidance": "Explore Legal Guidance"
-    },
-    "problem": {
-      "headline": "The Legal Challenge in India",
-      "subheadline": "Navigating the Indian legal system can be overwhelming. With millions of cases pending and complex procedures, many citizens feel helpless.",
-      "stat1": "India registers over 6.2 million crimes annually",
-      "stat2": "More than 17,000 crimes are reported daily",
-      "stat3": "Thousands struggle with drafting formal complaints",
-      "stat4": "Lack of affordable legal guidance for common issues"
-    },
-    "features": {
-      "headline": "Powerful AI Features",
-      "subheadline": "Our modular AI system is designed to provide specific assistance for different legal needs.",
-      "feat1": {
-        "title": "AI Complaint Generator",
-        "description": "Generate police complaints and legal applications automatically with professional formatting."
-      },
-      "feat2": {
-        "title": "Legal Guidance AI",
-        "description": "Understand relevant laws (IPC/BNS) and get clear steps for your specific legal situation."
-      },
-      "feat3": {
-        "title": "AI Case Research",
-        "description": "Search similar cases and landmark court judgments to strengthen your legal understanding."
-      },
-      "feat4": {
-        "title": "Document Templates",
-        "description": "Access pre-formatted legal documents and templates for various Indian legal requirements."
-      },
-      "feat5": {
-        "title": "AI Powered Chatbot",
-        "description": "Ask legal questions and receive instant AI-powered responses for your concerns."
-      }
-    },
+ "hero": {
+  "badge": "⚖️ AI Tools for Citizens & Lawyers",
+  "headline": "AI Legal Tools for Everyone – Built for Lawyers & Citizens",
+  "subheadline": "Draft complaints, get legal guidance, or manage full legal cases with AI-powered dashboard for lawyers.",
+  "ctaGenerate": "Start Drafting",
+  "ctaGuidance": "Creat Account"
+},
+  "problem": {
+  "headline": "Legal Problems Are Complex — For Everyone",
+  "subheadline": "Citizens struggle with legal understanding, while lawyers struggle with managing multiple cases efficiently.",
+  "stat1": "Citizens don’t know how to draft complaints",
+  "stat2": "Confusion about legal procedures",
+  "stat3": "Lawyers manage multiple cases manually",
+  "stat4": "Time-consuming research and documentation"
+},
+ "features": {
+  "headline": "AI Tools for Every Legal Need",
+  "subheadline": "From citizens to professional lawyers — everything in one platform",
+
+  "feat1": {
+    "title": "Drafting with AI",
+    "description": "Generate professional legal complaints and applications instantly."
+  },
+  "feat2": {
+    "title": "Legal Guidance AI",
+    "description": "Chat with AI to understand your legal problem and get step-by-step guidance."
+  },
+  "feat3": {
+    "title": "AI Case Research",
+    "description": "Find similar cases and judgments to strengthen your understanding."
+  },
+  "feat4": {
+    "title": "Lawyer Dashboard",
+    "description": "Manage cases, evidence, hearings and everything in one place."
+  },
+  "feat5": {
+    "title": "AI Case Assistant",
+    "description": "AI continuously analyzes your case and guides you until it is resolved."
+  }
+},
     "emergency": {
       "headline": "Know Your Rights & Emergency Help",
       "subheadline": "In case of emergency, use these official Government of India helpline numbers. Citizen safety is our priority.",
       "callNow": "Call Now"
     },
-    "cta": {
-      "headline": "Ready to simplify your legal journey?",
-      "subheadline": "Join thousands of citizens using PocketLawyer to access justice more efficiently.",
-      "button": "Start Your First Draft"
-    }
+"cta": {
+  "headline": "Start Using AI for Your Legal Work Today",
+  "subheadline": "Whether you're a citizen or a lawyer — PocketLawyer helps you work smarter.",
+  "button": "Get Started"
+}
   },
   "complaint": {
     "title": "AI Complaint Generator",
@@ -133,30 +134,32 @@
       "empty": "AI-researched case summaries and legal precedents will appear here."
     }
   },
-  "about": {
-    "title": "About PocketLawyer",
-    "subtitle": "PocketLawyer aims to democratize legal access in India using artificial intelligence. We believe that every citizen deserves to understand their rights and have the tools to seek justice.",
-    "mission": {
-      "title": "Our Mission",
-      "description": "To bridge the gap between complex legal systems and the common citizen through intuitive AI tools."
-    },
-    "vision": {
-      "title": "Our Vision",
-      "description": "A future where legal assistance is as accessible as a mobile app, empowering 1.4 billion Indians."
-    },
-    "values": {
-      "title": "Our Values",
-      "description": "Trust, accessibility, and integrity are at the core of everything we build at PocketLawyer."
-    },
-    "why": {
-      "title": "Why PocketLawyer?",
-      "description": "In India, legal awareness is often a privilege. PocketLawyer changes that by providing instant, accurate, and easy-to-understand legal support. Whether you're a student, a professional, or a citizen in need, we're here to help you navigate the law.",
-      "feat1": "AI-Powered Precision",
-      "feat2": "Indian Context Aware",
-      "feat3": "Privacy Focused",
-      "feat4": "User-Centric Design"
-    }
+"about": [
+  {
+    "title": "AI for Everyone",
+    "body": "Citizens can draft complaints and get legal help easily."
   },
+  {
+    "title": "Lawyer Dashboard",
+    "body": "Complete case management system built for legal professionals."
+  },
+  {
+    "title": "AI Case Assistant",
+    "body": "AI helps lawyers continuously until case resolution."
+  },
+  {
+    "title": "Save Time",
+    "body": "Automate repetitive legal work."
+  },
+  {
+    "title": "Secure Platform",
+    "body": "All data is सुरक्षित and private."
+  },
+  {
+    "title": "All-in-One Platform",
+    "body": "Everything from drafting to case management in one place."
+  }
+],
   "metadata": {
     "title": "PocketLawyer – Your AI Legal Assistant in Your Pocket",
     "description": "Generate legal complaints, understand laws, and research cases instantly using AI. Support for multiple Indian languages."

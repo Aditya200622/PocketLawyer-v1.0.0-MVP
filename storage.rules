@@ -1,0 +1,14 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Default rule: only authenticated users can access files
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Specific rule for user-segregated data if organized by userId folder
+    match /users/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

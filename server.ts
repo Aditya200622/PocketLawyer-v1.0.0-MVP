@@ -15,7 +15,7 @@ async function startServer() {
 
   const app = express();
   const PORT = 3001;
-app.use(cors());
+  app.use(cors());
   app.use(express.json());
 
   // =============================
@@ -81,7 +81,7 @@ Use professional Indian legal language.
   });
 
   // =============================
-  // Legal Guidance API
+  // Legal Guidance API  🔁 UPDATED prompt
   // =============================
   app.post("/api/ai/legal-guidance", async (req, res) => {
 
@@ -89,26 +89,47 @@ Use professional Indian legal language.
 
       const { issueType, description } = req.body;
 
+      // 🔁 UPDATED: Structured prompt for richer, conversational AI response
       const prompt = `
-You are an expert Indian Legal Advisor.
-
-Provide legal guidance for the following issue.
+Act as an expert Indian legal assistant. The user has the following issue:
 
 Issue Type: ${issueType}
 Description: ${description}
 
-Explain clearly:
+Provide a thorough, practical, step-by-step legal response strictly using the following structure. Use markdown formatting with the exact section headers shown below:
 
-1. Applicable Laws (IPC / BNS / relevant Acts)
-2. Explanation of the legal situation
-3. Immediate steps the citizen should take
-4. Which authority to approach
+## 🧾 Issue Summary
+Briefly summarize the user's issue in 2-3 sentences in simple language.
 
-Use clear and supportive language.
+## ⚖️ Legal Explanation
+Explain the applicable Indian laws (IPC / BNS / relevant Acts) in simple, clear language. Mention specific sections if applicable.
+
+## 🪜 Step-by-Step Actions
+List concrete, numbered steps the person should take immediately.
+
+## 🔗 Relevant Government Portals
+List 2-4 relevant official Indian government complaint portals as markdown links. Choose based on the issue type. Examples:
+- Cyber crime: https://cybercrime.gov.in/
+- Consumer complaints: https://consumerhelpline.gov.in/
+- Women safety: https://ncw.nic.in/
+- Police / General: https://services.india.gov.in/
+- RTI: https://rtionline.gov.in/
+- Labour: https://pgportal.gov.in/
+
+## 📄 Required Documents
+List documents the user may need to gather or submit.
+
+## 💡 Tips & Warnings
+Give 2-3 practical tips or important warnings the user must know.
+
+## 💬 Follow-up Questions
+Ask exactly 2-3 relevant follow-up questions to better understand the situation. These should help clarify facts, evidence, or next steps. Format as a numbered list.
+
+Keep the tone supportive, clear, and practical. Avoid legal jargon. Write for a common Indian citizen.
 `;
 
       const completion = await groq.chat.completions.create({
-       model: "llama-3.3-70b-versatile",
+        model: "llama-3.3-70b-versatile",
         messages: [
           { role: "user", content: prompt }
         ]
