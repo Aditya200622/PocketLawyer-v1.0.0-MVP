@@ -20,7 +20,6 @@ interface SidebarProps {
 
 const NAV_ITEMS = [
   { id: 'overview',      icon: Hash,       label: 'Overview',        badge: null },
-  { id: 'clients',       icon: User,       label: 'Clients',         badge: null },
   { id: 'research',      icon: Brain,      label: 'Research',        badge: null },
   { id: 'research-vault',icon: FolderOpen, label: 'Research Vault',  badge: null },
   { id: 'case-workspace',icon: Briefcase,  label: 'Case Workspace',  badge: null },
@@ -30,7 +29,6 @@ const NAV_ITEMS = [
   { id: 'timeline',      icon: FolderOpen, label: 'Timeline',        badge: null },
   { id: 'my-cases',      icon: Briefcase,  label: 'Cases',           badge: null },
   { id: 'files',         icon: FolderOpen, label: 'Files',           badge: null },
-  { id: 'evidence',      icon: FolderOpen, label: 'Evidence Vault',  badge: null },
   { id: 'ai-assistant',  icon: Brain,      label: 'AI Assistant',    badge: 'AI' },
   { id: 'moot-court',    icon: Scale,      label: 'Moot Court',      badge: null },
 ] as const;

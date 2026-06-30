@@ -1486,9 +1486,23 @@ const Files: React.FC<FilesProps> = ({ caseTitle = 'Sharma vs. State of UP', cas
               })}
 
               {filteredDocs.length === 0 && (
-                <div className="px-4 py-8 text-center">
-                  <FileIcon className="h-6 w-6 mx-auto mb-2" style={{ color: '#D1D5DB' }} />
-                  <p className="text-xs font-medium" style={{ color: '#9CA3AF' }}>No documents match</p>
+                <div className="px-4 py-16 flex flex-col items-center justify-center text-center">
+                  <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-3 border border-slate-100">
+                    <FileIcon className="h-5 w-5 text-slate-300" strokeWidth={1.5} />
+                  </div>
+                  <p className="text-sm font-semibold text-slate-900">No documents match</p>
+                  <p className="text-xs text-slate-500 mt-1 max-w-[200px]">
+                    Try adjusting your search or filters to find what you're looking for.
+                  </p>
+                  {(searchQuery !== '' || activeFilter !== 'all') && (
+                    <button
+                      onClick={() => { setSearchQuery(''); setActiveFilter('all'); }}
+                      className="mt-4 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-colors hover:bg-slate-100"
+                      style={{ color: '#374151', background: '#F3F4F6' }}
+                    >
+                      Clear filters
+                    </button>
+                  )}
                 </div>
               )}
             </div>

@@ -16,7 +16,6 @@ import { useNavigate } from 'react-router-dom';
 import Cases from "./Cases";
 import type { Case } from "./Cases";
 import Files from "./workspace/Files";
-import Evidence from "./workspace/Evidence";
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Scale, FileText, Brain,
@@ -38,7 +37,6 @@ import Research from "./Research";
 import ResearchVault from "./ResearchVault";
 import Settings from "./Settings";
 import Calendar from "./Calendar";
-import Clients from "./Clients";
 import MootCourt from "./workspace/MootCourt";
 // ─── Types ───────────────────────────────────────────────────────────────────
 type DashTab = string;
@@ -413,12 +411,16 @@ export const Dashboard = () => {
                           );
                         })}
                         {cases.length === 0 && (
-                          <div className="px-5 py-10 text-center">
-                            <p className="text-sm font-medium" style={{ color: '#6B7280' }}>No cases yet</p>
+                          <div className="px-5 py-12 flex flex-col items-center justify-center text-center">
+                            <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-3 border border-slate-100">
+                              <Briefcase className="h-5 w-5 text-slate-400" strokeWidth={1.5} />
+                            </div>
+                            <p className="text-sm font-medium text-slate-900">No cases yet</p>
+                            <p className="text-xs text-slate-500 mt-1 mb-3 max-w-[200px]">Get started by registering your first case to organize your legal workspace.</p>
                             <button
-                              onClick={() => setDashTab('my-cases')}
-                              className="text-xs mt-1 font-semibold"
-                              style={{ color: '#F97316' }}
+                              onClick={() => { setDashTab('my-cases'); setShowNewCase(true); }}
+                              className="text-xs font-semibold px-4 py-2 rounded-lg transition-all hover:bg-[#FFEDD5]"
+                              style={{ background: '#FFF7ED', color: '#EA580C' }}
                             >
                               Register first case →
                             </button>
@@ -452,10 +454,7 @@ export const Dashboard = () => {
   }}
 />
 )}
-              {/* ════ EVIDENCE ════ */}
-              {dashTab === "evidence" && (
-  <Evidence />
-)}
+              {/* ════ EVIDENCE (Removed) ════ */}
 {dashTab === "files" && (
   <Files />
 )}
@@ -514,9 +513,7 @@ export const Dashboard = () => {
     }}
   />
 )}
-{dashTab === 'clients' && (
-  <Clients />
-)}
+
 {dashTab === 'moot-court' && (
   <MootCourt caseTitle={selectedCase?.title} />
 )}

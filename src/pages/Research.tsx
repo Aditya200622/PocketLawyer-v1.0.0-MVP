@@ -57,7 +57,7 @@ interface ClientFilters {
    CONSTANTS  (API_URL, STEPS, and the filtering flow are unchanged)
    ========================================================================== */
 
-const API_URL = "http://localhost:5000/api/cases";
+const API_URL = "/api/ai/case-research";
 
 const STEPS = [
   {

@@ -8,6 +8,7 @@ import {
 import { subscribeToCases, CaseDocument } from '../../services/caseService';
 import { subscribeDocuments, DocumentRecord } from '../../services/documentService';
 import { auth } from '../../auth';
+import { useNavigate } from 'react-router-dom';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type DraftStatus = 'draft' | 'review' | 'approved' | 'exported';
@@ -77,6 +78,7 @@ const getDraftStatus = (name: string): DraftStatus => {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Drafts() {
+  const navigate = useNavigate();
   const [search, setSearch]             = useState('');
   const [filterStatus, setFilterStatus] = useState<DraftStatus | 'all'>('all');
   const [selected, setSelected]         = useState<Draft | null>(null);
@@ -190,7 +192,10 @@ export default function Drafts() {
 
   const handleGenerate = (templateId: string) => {
     setGenerating(templateId);
-    setTimeout(() => setGenerating(null), 1800);
+    // Add small delay to show animation before route change
+    setTimeout(() => {
+      navigate('/generate');
+    }, 400);
   };
 
   const toggleStar = (id: string) => {
@@ -292,20 +297,11 @@ export default function Drafts() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-0 divide-x divide-y" style={{ borderColor: '#E5E7EB' }}>
             {TEMPLATES.map((t, i) => (
-              <motion.button
+              <button
                 key={t.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.12 + i * 0.04 }}
                 onClick={() => handleGenerate(t.id)}
-                className="relative flex flex-col items-start gap-2 p-5 text-left transition-all group"
+                className="relative z-10 flex flex-col items-start gap-2 p-5 text-left transition-all group cursor-pointer w-full hover:bg-gray-50 border-0 focus:outline-none"
                 style={{ background: generating === t.id ? '#FFF7ED' : 'transparent' }}
-                onMouseEnter={e => {
-                  if (generating !== t.id) (e.currentTarget as HTMLElement).style.background = '#FAFAFA';
-                }}
-                onMouseLeave={e => {
-                  if (generating !== t.id) (e.currentTarget as HTMLElement).style.background = 'transparent';
-                }}
               >
                 <div
                   className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
@@ -332,7 +328,7 @@ export default function Drafts() {
                   className="h-3 w-3 absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"
                   style={{ color: '#9CA3AF' }}
                 />
-              </motion.button>
+              </button>
             ))}
           </div>
         </motion.div>
@@ -498,10 +494,23 @@ export default function Drafts() {
                 })}
               </AnimatePresence>
               {filtered.length === 0 && (
-                <div className="py-12 text-center">
-                  <FileText className="h-8 w-8 mx-auto mb-2" style={{ color: '#D1D5DB' }} />
-                  <p className="text-sm font-medium text-gray-500">No drafts found</p>
-                  <p className="text-xs mt-0.5" style={{ color: '#9CA3AF' }}>Try adjusting your search or filter</p>
+                <div className="py-16 flex flex-col items-center justify-center text-center">
+                  <div className="w-14 h-14 rounded-full bg-slate-50 flex items-center justify-center mb-4 border border-slate-100">
+                    <FileText className="h-6 w-6 text-slate-300" strokeWidth={1.5} />
+                  </div>
+                  <p className="text-sm font-semibold text-slate-900">No drafts found</p>
+                  <p className="text-xs text-slate-500 mt-1.5 max-w-[220px]">
+                    We couldn't find any drafts matching your current search or filter criteria.
+                  </p>
+                  {(search !== '' || filterStatus !== 'all') && (
+                    <button
+                      onClick={() => { setSearch(''); setFilterStatus('all'); }}
+                      className="mt-4 text-xs font-semibold px-4 py-2 rounded-lg transition-colors hover:bg-slate-100"
+                      style={{ color: '#374151', background: '#F3F4F6' }}
+                    >
+                      Clear filters
+                    </button>
+                  )}
                 </div>
               )}
             </div>

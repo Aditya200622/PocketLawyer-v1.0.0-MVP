@@ -7,10 +7,9 @@ import {
 import type { Case } from '../Cases';
 import Overview from './Overview';
 import Files from './Files';
-import Evidence from './Evidence';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-type WorkspaceTab = 'overview' | 'files' | 'evidence';
+type WorkspaceTab = 'overview' | 'files';
 
 interface CaseWorkspaceProps {
   caseData?: Case;
@@ -38,7 +37,6 @@ const statusDot: Record<string, string> = {
 const TABS: Array<{ id: WorkspaceTab; label: string; icon: React.ElementType }> = [
   { id: 'overview', label: 'Overview', icon: LayoutGrid },
   { id: 'files', label: 'Files', icon: FileText },
-  { id: 'evidence', label: 'Evidence', icon: ShieldCheck },
 ];
 
 const formatDate = (dateStr?: string) => {
@@ -171,7 +169,6 @@ const CaseWorkspace: React.FC<CaseWorkspaceProps> = ({
         >
           {tab === 'overview' && <Overview activeCase={c} />}
           {tab === 'files' && <Files caseTitle={c.title} caseId={c.id} />}
-          {tab === 'evidence' && <Evidence caseTitle={c.title} />}
         </motion.div>
       </AnimatePresence>
     </div>

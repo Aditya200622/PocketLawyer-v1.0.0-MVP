@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { subscribeHearings, Hearing as ServiceHearing, createHearing, updateHearing, deleteHearing } from '../../services/hearingService';
+import { subscribeToCases, CaseDocument } from '../../services/caseService';
 import { auth } from '../../firebase';
-import { useEffect } from 'react';
 
 import {
   Calendar, Clock, Plus, Download, Filter,
@@ -25,6 +25,10 @@ interface Hearing {
   notes: string;
   attachments: string[];
   status: 'upcoming' | 'today' | 'completed' | 'adjourned';
+  rawStatus: string;
+  nextHearingDate: string;
+  nextHearingTime: string;
+  courtRoom: string;
 }
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
@@ -55,12 +59,54 @@ const fmt = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-IN',
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Hearings() {
   const [hearings, setHearings]                 = useState<Hearing[]>([]);
+  const [cases, setCases]                       = useState<CaseDocument[]>([]);
   const [selected, setSelected]                 = useState<Hearing | null>(null);
   const [filterStatus, setFilterStatus]         = useState<string>('all');
+  const [selectedCaseId, setSelectedCaseId]     = useState<string>('all');
   const [search, setSearch]                     = useState('');
   const [calYear,  setCalYear]                  = useState(new Date().getFullYear());
   const [calMonth, setCalMonth]                 = useState(new Date().getMonth());
 
+  // Notes state
+  const [notesText, setNotesText]               = useState('');
+  const [isSavingNotes, setIsSavingNotes]       = useState(false);
+
+  // Modals state
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [schedCaseId, setSchedCaseId]           = useState('');
+  const [schedCourtName, setSchedCourtName]     = useState('');
+  const [schedJudgeName, setSchedJudgeName]     = useState('');
+  const [schedCourtRoom, setSchedCourtRoom]     = useState('');
+  const [schedDate, setSchedDate]               = useState('');
+  const [schedTime, setSchedTime]               = useState('');
+  const [schedPurpose, setSchedPurpose]         = useState('');
+  const [schedRemarks, setSchedRemarks]         = useState('');
+
+  const [isEditModalOpen, setIsEditModalOpen]   = useState(false);
+  const [editCourt, setEditCourt]               = useState('');
+  const [editJudge, setEditJudge]               = useState('');
+  const [editRoom, setEditRoom]                 = useState('');
+  const [editDate, setEditDate]                 = useState('');
+  const [editTime, setEditTime]                 = useState('');
+  const [editNextDate, setEditNextDate]         = useState('');
+  const [editNextTime, setEditNextTime]         = useState('');
+  const [editPurpose, setEditPurpose]           = useState('');
+  const [editStatus, setEditStatus]             = useState<ServiceHearing['status']>('scheduled');
+
+  // Load cases
+  useEffect(() => {
+    const user = auth.currentUser;
+    const userId = user?.uid || 'anonymous';
+    const unsub = subscribeToCases(userId, (casesList) => {
+      setCases(casesList);
+      if (casesList.length > 0) {
+        setSchedCaseId(casesList[0].id);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // Load hearings
   useEffect(() => {
     const user = auth.currentUser;
     const userId = user?.uid || 'anonymous';
@@ -72,11 +118,16 @@ export default function Hearings() {
         else if (h.status === 'adjourned') st = 'adjourned';
         else if (h.hearingDate === todayStr) st = 'today';
 
+        const matchCaseRecord = cases.find(c => c.id === h.caseId);
+        const resolvedTitle = matchCaseRecord 
+          ? `${matchCaseRecord.caseNumber} - ${matchCaseRecord.title}`
+          : (h.caseNumber || 'Unknown Case');
+
         return {
           id: h.hearingId,
           caseId: h.caseId || 'UNKNOWN',
-          caseTitle: h.caseNumber || 'Unknown Case',
-          client: 'Unknown Client',
+          caseTitle: resolvedTitle,
+          client: 'Active Client',
           court: h.courtName || 'Unknown Court',
           judge: h.judgeName || 'Unknown Judge',
           date: h.hearingDate,
@@ -85,20 +136,244 @@ export default function Hearings() {
           notes: h.remarks || '',
           attachments: [],
           status: st,
+          rawStatus: h.status,
+          nextHearingDate: h.nextHearingDate || '',
+          nextHearingTime: h.nextHearingTime || '',
+          courtRoom: h.courtRoom || '',
         };
       });
       setHearings(mapped);
-      if (mapped.length > 0 && !selected) setSelected(mapped[0]);
+      // Auto-select first hearing or update existing selected one
+      if (mapped.length > 0) {
+        if (!selected) {
+          setSelected(mapped[0]);
+        } else {
+          const freshSelected = mapped.find(x => x.id === selected.id);
+          if (freshSelected) setSelected(freshSelected);
+        }
+      }
     });
     return () => unsub();
-  }, []);
+  }, [cases]);
+
+  // Sync notes text
+  useEffect(() => {
+    if (selected) {
+      setNotesText(selected.notes);
+    } else {
+      setNotesText('');
+    }
+  }, [selected]);
+
+  const handleSaveNotes = async () => {
+    if (!selected) return;
+    setIsSavingNotes(true);
+    try {
+      await updateHearing(selected.id, { remarks: notesText });
+    } catch (err) {
+      console.error('Failed to save remarks:', err);
+    } finally {
+      setIsSavingNotes(false);
+    }
+  };
+
+  const openScheduleModal = () => {
+    setSchedCourtName('');
+    setSchedJudgeName('');
+    setSchedCourtRoom('');
+    setSchedDate(new Date().toISOString().split('T')[0]);
+    setSchedTime('10:00');
+    setSchedPurpose('Regular Hearing');
+    setSchedRemarks('');
+    setIsScheduleModalOpen(true);
+  };
+
+  const handleScheduleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const user = auth.currentUser;
+    const selectedCase = cases.find(c => c.id === schedCaseId);
+    try {
+      await createHearing({
+        caseId: schedCaseId,
+        caseNumber: selectedCase?.caseNumber || 'Unknown Case',
+        courtName: schedCourtName,
+        judgeName: schedJudgeName,
+        courtRoom: schedCourtRoom,
+        hearingDate: schedDate,
+        hearingTime: schedTime,
+        nextHearingDate: '',
+        nextHearingTime: '',
+        purpose: schedPurpose,
+        status: 'scheduled',
+        remarks: schedRemarks,
+        createdBy: user?.displayName || 'User',
+        userId: user?.uid || 'anonymous'
+      });
+      setIsScheduleModalOpen(false);
+    } catch (err) {
+      console.error('Failed to create hearing:', err);
+    }
+  };
+
+  const openEditModal = () => {
+    if (!selected) return;
+    setEditCourt(selected.court);
+    setEditJudge(selected.judge);
+    setEditRoom(selected.courtRoom);
+    setEditDate(selected.date);
+    setEditTime(selected.time);
+    setEditNextDate(selected.nextHearingDate);
+    setEditNextTime(selected.nextHearingTime);
+    setEditPurpose(selected.type);
+    setEditStatus(selected.rawStatus as ServiceHearing['status']);
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selected) return;
+    try {
+      await updateHearing(selected.id, {
+        courtName: editCourt,
+        judgeName: editJudge,
+        courtRoom: editRoom,
+        hearingDate: editDate,
+        hearingTime: editTime,
+        nextHearingDate: editNextDate,
+        nextHearingTime: editNextTime,
+        purpose: editPurpose,
+        status: editStatus,
+      });
+      setIsEditModalOpen(false);
+    } catch (err) {
+      console.error('Failed to update hearing:', err);
+    }
+  };
+
+  const exportToICS = (h: Hearing) => {
+    const title = h.caseTitle;
+    const desc = `Purpose: ${h.type}\\nCourt: ${h.court}\\nJudge: ${h.judge}\\nNotes: ${h.notes}`;
+    const location = h.court;
+    const [year, month, day] = h.date.split('-').map(Number);
+    const [hour, min] = (h.time || '10:00').split(':').map(Number);
+    const startDate = new Date(Date.UTC(year, month - 1, day, hour, min));
+    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+
+    const fmtICSDate = (date: Date) => {
+      return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    };
+
+    const icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//PocketLawyer//Hearing Calendar//EN',
+      'BEGIN:VEVENT',
+      `UID:hearing-${h.id}@pocketlawyer.app`,
+      `DTSTAMP:${fmtICSDate(new Date())}`,
+      `DTSTART:${fmtICSDate(startDate)}`,
+      `DTEND:${fmtICSDate(endDate)}`,
+      `SUMMARY:Court Hearing - ${title}`,
+      `DESCRIPTION:${desc}`,
+      `LOCATION:${location}`,
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].join('\r\n');
+
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `hearing-${h.caseId}-${h.date}.ics`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportAllToICS = () => {
+    if (hearings.length === 0) return;
+    const fmtICSDate = (date: Date) => {
+      return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    };
+
+    const eventBlocks = hearings.map(h => {
+      const title = h.caseTitle;
+      const desc = `Purpose: ${h.type}\\nCourt: ${h.court}\\nJudge: ${h.judge}\\nNotes: ${h.notes}`;
+      const location = h.court;
+      const [year, month, day] = h.date.split('-').map(Number);
+      const [hour, min] = (h.time || '10:00').split(':').map(Number);
+      const startDate = new Date(Date.UTC(year, month - 1, day, hour, min));
+      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+
+      return [
+        'BEGIN:VEVENT',
+        `UID:hearing-${h.id}@pocketlawyer.app`,
+        `DTSTAMP:${fmtICSDate(new Date())}`,
+        `DTSTART:${fmtICSDate(startDate)}`,
+        `DTEND:${fmtICSDate(endDate)}`,
+        `SUMMARY:Court Hearing - ${title}`,
+        `DESCRIPTION:${desc}`,
+        `LOCATION:${location}`,
+        'END:VEVENT'
+      ].join('\r\n');
+    }).join('\r\n');
+
+    const icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//PocketLawyer//Hearing Calendar//EN',
+      eventBlocks,
+      'END:VCALENDAR'
+    ].join('\r\n');
+
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `pocketlawyer-all-hearings.ics`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleSetReminder = (h: Hearing) => {
+    if (!('Notification' in window)) {
+      alert('This browser does not support notifications.');
+      return;
+    }
+
+    Notification.requestPermission().then(permission => {
+      if (permission === 'granted') {
+        const hearingTimeStr = `${h.date}T${h.time || '10:00'}:00`;
+        const timeDiff = new Date(hearingTimeStr).getTime() - new Date().getTime();
+
+        if (timeDiff <= 0) {
+          alert('Hearing is already in the past. Alert triggered.');
+          new Notification(`Court Hearing Alert`, {
+            body: `Hearing for Case: ${h.caseTitle} is scheduled today.`,
+          });
+          return;
+        }
+
+        setTimeout(() => {
+          new Notification(`Upcoming Court Hearing`, {
+            body: `Hearing for Case: ${h.caseTitle} is starting now at ${h.court}.`,
+          });
+        }, Math.min(timeDiff, 2147483647));
+
+        alert(`Notification reminder scheduled successfully for ${fmt(h.date)} at ${h.time}.`);
+      } else {
+        alert('Notification permission was denied.');
+      }
+    });
+  };
 
   const filtered = hearings.filter(h => {
     const matchSearch = h.caseTitle.toLowerCase().includes(search.toLowerCase()) ||
                         h.client.toLowerCase().includes(search.toLowerCase()) ||
                         h.court.toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === 'all' || h.status === filterStatus;
-    return matchSearch && matchStatus;
+    const matchCase = selectedCaseId === 'all' || h.caseId === selectedCaseId;
+    return matchSearch && matchStatus && matchCase;
   }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const todayHearings  = hearings.filter(h => h.date === new Date().toISOString().split('T')[0]).length;
@@ -143,6 +418,7 @@ export default function Hearings() {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={exportAllToICS}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
               style={{ background: '#FFFFFF', border: '1px solid #E5E7EB', color: '#374151' }}
               onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = '#F9FAFB')}
@@ -151,15 +427,7 @@ export default function Hearings() {
               <Download className="h-4 w-4" /> Export Calendar
             </button>
             <button
-              onClick={() => {
-                const user = auth.currentUser;
-                createHearing({
-                  caseId: "C00" + Math.floor(Math.random() * 10), caseNumber: "DUMMY/123", courtName: "High Court",
-                  judgeName: "Hon'ble Judge", courtRoom: "Room 1", hearingDate: new Date().toISOString().split('T')[0],
-                  hearingTime: "10:00", nextHearingDate: "", nextHearingTime: "", purpose: "New Hearing",
-                  status: "scheduled", remarks: "Dummy", createdBy: user?.displayName || "System", userId: user?.uid || "anonymous"
-                }).catch(console.error);
-              }}
+              onClick={openScheduleModal}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
               style={{ background: '#F97316' }}
               onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = '#EA580C')}
@@ -210,15 +478,15 @@ export default function Hearings() {
         </motion.div>
 
         {/* ── Main Content ── */}
-        <div className="flex gap-5">
+        <div className="flex gap-5 flex-col lg:flex-row">
 
           {/* ── Left: Hearings List + Calendar ── */}
           <div className="flex-1 min-w-0 space-y-5">
 
             {/* Search + Filter */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <div
-                className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl"
+                className="flex-1 min-w-[200px] flex items-center gap-2 px-3 py-2.5 rounded-xl"
                 style={{ background: '#FFFFFF', border: '1px solid #E5E7EB' }}
               >
                 <Search className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#9CA3AF' }} />
@@ -230,9 +498,22 @@ export default function Hearings() {
                   className="bg-transparent outline-none text-sm flex-1 placeholder-gray-400 text-gray-900"
                 />
               </div>
+
+              {/* Case Filter Dropdown */}
+              <select
+                value={selectedCaseId}
+                onChange={e => setSelectedCaseId(e.target.value)}
+                className="px-3 py-2.5 rounded-xl border border-gray-200 text-sm bg-white text-gray-700 outline-none focus:border-orange-500"
+              >
+                <option value="all">All Cases</option>
+                {cases.map(c => (
+                  <option key={c.id} value={c.id}>{c.caseNumber} - {c.title}</option>
+                ))}
+              </select>
+
               <div
-                className="flex items-center gap-1 p-1 rounded-xl"
-                style={{ background: '#FFFFFF', border: '1px solid #E5E7EB' }}
+                className="flex items-center gap-1 p-1 rounded-xl bg-white"
+                style={{ border: '1px solid #E5E7EB' }}
               >
                 {[
                   { key: 'all',       label: 'All'       },
@@ -243,7 +524,7 @@ export default function Hearings() {
                   <button
                     key={f.key}
                     onClick={() => setFilterStatus(f.key)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer"
                     style={filterStatus === f.key ? {
                       background: '#111827', color: '#FFFFFF'
                     } : { color: '#6B7280' }}
@@ -308,7 +589,7 @@ export default function Hearings() {
                                   className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded"
                                   style={{ background: '#F3F4F6', color: '#6B7280' }}
                                 >
-                                  {h.caseId}
+                                  {cases.find(c => c.id === h.caseId)?.caseNumber || h.caseId}
                                 </span>
                                 <h3 className="text-sm font-semibold text-gray-900 truncate">{h.caseTitle}</h3>
                               </div>
@@ -353,8 +634,8 @@ export default function Hearings() {
 
               {filtered.length === 0 && (
                 <div
-                  className="rounded-xl py-12 text-center"
-                  style={{ background: '#FFFFFF', border: '1px solid #E5E7EB' }}
+                  className="rounded-xl py-12 text-center bg-white"
+                  style={{ border: '1px solid #E5E7EB' }}
                 >
                   <Calendar className="h-8 w-8 mx-auto mb-2" style={{ color: '#D1D5DB' }} />
                   <p className="text-sm font-medium text-gray-500">No hearings found</p>
@@ -365,8 +646,8 @@ export default function Hearings() {
 
             {/* Calendar */}
             <div
-              className="rounded-xl overflow-hidden"
-              style={{ background: '#FFFFFF', border: '1px solid #E5E7EB' }}
+              className="rounded-xl overflow-hidden bg-white"
+              style={{ border: '1px solid #E5E7EB' }}
             >
               <div
                 className="flex items-center justify-between px-5 py-4"
@@ -379,9 +660,7 @@ export default function Hearings() {
                 <div className="flex items-center gap-1">
                   <button
                     onClick={prevMonth}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
-                    onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = '#F3F4F6')}
-                    onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-gray-100 cursor-pointer"
                   >
                     <ChevronLeft className="h-4 w-4" style={{ color: '#6B7280' }} />
                   </button>
@@ -390,9 +669,7 @@ export default function Hearings() {
                   </span>
                   <button
                     onClick={nextMonth}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
-                    onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = '#F3F4F6')}
-                    onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-gray-100 cursor-pointer"
                   >
                     <ChevronRight className="h-4 w-4" style={{ color: '#6B7280' }} />
                   </button>
@@ -419,16 +696,10 @@ export default function Hearings() {
                     return (
                       <button
                         key={cell.date}
-                        className="flex flex-col items-center py-2 rounded-lg transition-all"
+                        className="flex flex-col items-center py-2 rounded-lg transition-all cursor-pointer hover:bg-gray-100"
                         style={{
                           background: isToday ? '#F97316' : 'transparent',
                           cursor: hasHearing ? 'pointer' : 'default',
-                        }}
-                        onMouseEnter={e => {
-                          if (!isToday) (e.currentTarget as HTMLElement).style.background = '#F3F4F6';
-                        }}
-                        onMouseLeave={e => {
-                          if (!isToday) (e.currentTarget as HTMLElement).style.background = 'transparent';
                         }}
                       >
                         <span
@@ -472,7 +743,7 @@ export default function Hearings() {
           </div>
 
           {/* ── Right Detail Panel ── */}
-          <div className="hidden lg:block w-72 flex-shrink-0">
+          <div className="w-full lg:w-80 flex-shrink-0">
             <div className="sticky top-8">
               <AnimatePresence mode="wait">
                 {selected ? (
@@ -482,13 +753,13 @@ export default function Hearings() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 12 }}
                     transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                    className="rounded-xl overflow-hidden"
-                    style={{ background: '#FFFFFF', border: '1px solid #E5E7EB' }}
+                    className="rounded-xl overflow-hidden bg-white"
+                    style={{ border: '1px solid #E5E7EB' }}
                   >
                     {/* Panel header */}
                     <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid #E5E7EB' }}>
                       <span className="text-xs font-semibold text-gray-900">Hearing Details</span>
-                      <button onClick={() => setSelected(null)}>
+                      <button onClick={() => setSelected(null)} className="cursor-pointer">
                         <X className="h-4 w-4" style={{ color: '#9CA3AF' }} />
                       </button>
                     </div>
@@ -496,14 +767,14 @@ export default function Hearings() {
                     {/* Status pill */}
                     <div className="px-4 pt-4 pb-2">
                       {(() => {
-                        const urg = urgencyConfig(selected.date, selected.status);
+                        const urg = urgencyConfig(selected.date, selected.rawStatus);
                         return (
                           <span
                             className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full"
                             style={{ background: urg.bg, color: urg.text }}
                           >
                             <span className="w-1.5 h-1.5 rounded-full" style={{ background: urg.dot }} />
-                            {urg.badge === 'Today' ? 'Today' : urg.badge === 'Completed' ? 'Completed' : `In ${urg.badge}`}
+                            {urg.badge === 'Today' ? 'Today' : urg.badge === 'Completed' ? 'Completed' : urg.badge === 'Adjourned' ? 'Adjourned' : `In ${urg.badge}`}
                           </span>
                         );
                       })()}
@@ -519,10 +790,13 @@ export default function Hearings() {
                     <div className="px-4 py-3 space-y-3" style={{ borderBottom: '1px solid #F3F4F6' }}>
                       {[
                         { icon: User,      label: 'Client',  value: selected.client  },
-                        { icon: MapPin,    label: 'Court',   value: selected.court   },
+                        { icon: MapPin,    label: 'Court',   value: `${selected.court} ${selected.courtRoom ? `(Room ${selected.courtRoom})` : ''}` },
                         { icon: Gavel,     label: 'Judge',   value: selected.judge   },
                         { icon: Calendar,  label: 'Date',    value: fmt(selected.date) },
                         { icon: Clock,     label: 'Time',    value: selected.time    },
+                        ...(selected.nextHearingDate ? [
+                          { icon: Calendar,  label: 'Next Hearing Date', value: `${fmt(selected.nextHearingDate)} ${selected.nextHearingTime ? `@ ${selected.nextHearingTime}` : ''}` }
+                        ] : []),
                       ].map(f => (
                         <div key={f.label} className="flex items-start gap-2.5">
                           <f.icon className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" style={{ color: '#9CA3AF' }} />
@@ -534,10 +808,23 @@ export default function Hearings() {
                       ))}
                     </div>
 
-                    {/* Notes */}
+                    {/* Interactive Notes/Remarks */}
                     <div className="px-4 py-3" style={{ borderBottom: '1px solid #F3F4F6' }}>
-                      <p className="text-[9px] font-semibold uppercase tracking-wider mb-2" style={{ color: '#9CA3AF' }}>Notes</p>
-                      <p className="text-xs leading-relaxed" style={{ color: '#374151' }}>{selected.notes}</p>
+                      <p className="text-[9px] font-semibold uppercase tracking-wider mb-2" style={{ color: '#9CA3AF' }}>Hearing Notes / Remarks</p>
+                      <textarea
+                        value={notesText}
+                        onChange={e => setNotesText(e.target.value)}
+                        className="w-full text-xs p-2 border border-gray-200 rounded-lg outline-none resize-none focus:border-orange-500"
+                        rows={3}
+                        placeholder="Save hearing notes or remarks here..."
+                      />
+                      <button
+                        onClick={handleSaveNotes}
+                        disabled={isSavingNotes}
+                        className="mt-2 text-[11px] w-full font-semibold bg-gray-900 text-white py-1.5 rounded-lg hover:bg-gray-800 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {isSavingNotes ? 'Saving...' : 'Save Remarks'}
+                      </button>
                     </div>
 
                     {/* Attachments */}
@@ -565,15 +852,10 @@ export default function Hearings() {
                     <div className="px-4 py-3 flex flex-col gap-2">
                       <div className="flex gap-2">
                         <button
-                          onClick={() => {
-                            if (selected) updateHearing(selected.id, { purpose: selected.type + " (Updated)" }).catch(console.error);
-                          }}
-                          className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all"
-                          style={{ background: '#F3F4F6', color: '#374151' }}
-                          onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = '#E5E7EB')}
-                          onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = '#F3F4F6')}
+                          onClick={openEditModal}
+                          className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all bg-gray-100 hover:bg-gray-200 text-gray-700 cursor-pointer"
                         >
-                          Edit
+                          Reschedule / Edit
                         </button>
                         <button
                           onClick={() => {
@@ -582,29 +864,22 @@ export default function Hearings() {
                               setSelected(null);
                             }
                           }}
-                          className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-white transition-all"
-                          style={{ background: '#EF4444' }}
-                          onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = '#DC2626')}
-                          onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = '#EF4444')}
+                          className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-white bg-red-500 hover:bg-red-600 transition-all cursor-pointer"
                         >
                           Delete
                         </button>
                       </div>
                       <button
-                        className="w-full py-2.5 rounded-xl text-xs font-semibold text-white transition-all"
-                        style={{ background: '#F97316' }}
-                        onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = '#EA580C')}
-                        onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = '#F97316')}
+                        onClick={() => handleSetReminder(selected)}
+                        className="w-full py-2.5 rounded-xl text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 transition-all cursor-pointer"
                       >
                         Set Reminder
                       </button>
                       <button
-                        className="w-full py-2.5 rounded-xl text-xs font-semibold transition-all"
-                        style={{ background: '#F3F4F6', color: '#374151' }}
-                        onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = '#E5E7EB')}
-                        onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = '#F3F4F6')}
+                        onClick={() => exportToICS(selected)}
+                        className="w-full py-2.5 rounded-xl text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 transition-all cursor-pointer"
                       >
-                        Export Details
+                        Export Calendar ICS
                       </button>
                     </div>
                   </motion.div>
@@ -614,8 +889,8 @@ export default function Hearings() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="rounded-xl p-8 text-center"
-                    style={{ background: '#FFFFFF', border: '1px solid #E5E7EB' }}
+                    className="rounded-xl p-8 text-center bg-white"
+                    style={{ border: '1px solid #E5E7EB' }}
                   >
                     <Gavel className="h-8 w-8 mx-auto mb-2" style={{ color: '#D1D5DB' }} />
                     <p className="text-sm font-medium text-gray-500">Select a hearing</p>
@@ -627,6 +902,276 @@ export default function Hearings() {
           </div>
         </div>
       </div>
+
+      {/* ── Modals ── */}
+      <AnimatePresence>
+        {/* Schedule Hearing Modal */}
+        {isScheduleModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="font-bold text-gray-900">Schedule Hearing</h3>
+                <button onClick={() => setIsScheduleModalOpen(false)}>
+                  <X className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                </button>
+              </div>
+              <form onSubmit={handleScheduleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase">Select Case</label>
+                  <select
+                    value={schedCaseId}
+                    onChange={e => setSchedCaseId(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white"
+                    required
+                  >
+                    {cases.map(c => (
+                      <option key={c.id} value={c.id}>{c.caseNumber} - {c.title}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase">Court Name</label>
+                  <input
+                    type="text"
+                    value={schedCourtName}
+                    onChange={e => setSchedCourtName(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                    required
+                    placeholder="e.g. High Court of Delhi"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase">Judge Name</label>
+                  <input
+                    type="text"
+                    value={schedJudgeName}
+                    onChange={e => setSchedJudgeName(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                    required
+                    placeholder="Hon'ble Justice..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase">Court Room</label>
+                  <input
+                    type="text"
+                    value={schedCourtRoom}
+                    onChange={e => setSchedCourtRoom(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                    placeholder="e.g. Room 3"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase">Hearing Date</label>
+                    <input
+                      type="date"
+                      value={schedDate}
+                      onChange={e => setSchedDate(e.target.value)}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase">Hearing Time</label>
+                    <input
+                      type="time"
+                      value={schedTime}
+                      onChange={e => setSchedTime(e.target.value)}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase">Purpose</label>
+                  <input
+                    type="text"
+                    value={schedPurpose}
+                    onChange={e => setSchedPurpose(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                    required
+                    placeholder="e.g. Admission / Argument"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase">Remarks / Notes</label>
+                  <textarea
+                    value={schedRemarks}
+                    onChange={e => setSchedRemarks(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                    rows={2}
+                    placeholder="Remarks..."
+                  />
+                </div>
+                <div className="flex gap-3 justify-end pt-4 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsScheduleModalOpen(false)}
+                    className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-50 border border-gray-200 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 transition-all cursor-pointer"
+                  >
+                    Schedule
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Reschedule / Edit Hearing Modal */}
+        {isEditModalOpen && selected && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="font-bold text-gray-900">Reschedule / Edit Hearing</h3>
+                <button onClick={() => setIsEditModalOpen(false)}>
+                  <X className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                </button>
+              </div>
+              <form onSubmit={handleEditSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase">Court Name</label>
+                  <input
+                    type="text"
+                    value={editCourt}
+                    onChange={e => setEditCourt(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase">Judge Name</label>
+                  <input
+                    type="text"
+                    value={editJudge}
+                    onChange={e => setEditJudge(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase">Court Room</label>
+                  <input
+                    type="text"
+                    value={editRoom}
+                    onChange={e => setEditRoom(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase">Hearing Date</label>
+                    <input
+                      type="date"
+                      value={editDate}
+                      onChange={e => setEditDate(e.target.value)}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase">Hearing Time</label>
+                    <input
+                      type="time"
+                      value={editTime}
+                      onChange={e => setEditTime(e.target.value)}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase">Next Hearing Date</label>
+                    <input
+                      type="date"
+                      value={editNextDate}
+                      onChange={e => setEditNextDate(e.target.value)}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase">Next Hearing Time</label>
+                    <input
+                      type="time"
+                      value={editNextTime}
+                      onChange={e => setEditNextTime(e.target.value)}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase">Purpose</label>
+                  <input
+                    type="text"
+                    value={editPurpose}
+                    onChange={e => setEditPurpose(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase">Status</label>
+                  <select
+                    value={editStatus}
+                    onChange={e => setEditStatus(e.target.value as any)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white"
+                  >
+                    <option value="scheduled">Scheduled</option>
+                    <option value="adjourned">Adjourned</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="pending">Pending</option>
+                  </select>
+                </div>
+                <div className="flex gap-3 justify-end pt-4 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-50 border border-gray-200 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 transition-all cursor-pointer"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

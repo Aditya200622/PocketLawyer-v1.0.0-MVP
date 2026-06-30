@@ -11,11 +11,11 @@ import React, {
 } from 'react';
 import { subscribeToCases, type CaseDocument } from '../services/caseService';
 import { uploadDocument } from '../services/documentService';
-import { aiService } from '../services/aiService';
+import { aiService, generateMissingInfo } from '../services/aiService';
 import { auth } from '../auth';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  FileText, Send, Copy, Printer, CheckCircle,
+  FileText, Send, Copy, Printer, CheckCircle, AlertCircle,
   Loader2, Upload, ChevronRight, ChevronLeft, RotateCcw,
   ChevronDown, ChevronUp, Search, Plus, X, Save, Download,
   Bold, Italic, Underline, List, Hash, Maximize2, ZoomIn,
@@ -171,10 +171,6 @@ interface SavedDraft {
 
 async function generateComplaintViaBackend(data: FormData): Promise<string> {
   const category = CATEGORIES.find(c => c.key === data.category);
-  const pageCount = data.useRecommendedLength
-    ? (data.draftLevel === 'basic' ? 3 : data.draftLevel === 'standard' ? 12 : 22)
-    : data.customPageCount;
-
   const description = [
     `Applicant: ${data.applicantName}`,
     `Mobile: ${data.applicantMobile}`,
@@ -182,7 +178,7 @@ async function generateComplaintViaBackend(data: FormData): Promise<string> {
     data.description,
     `Requested Action: ${data.requestedAction || 'Appropriate legal action'}`,
     `Draft Style: ${data.draftStyle}`,
-    `Target Pages: ${pageCount}`,
+    `Draft Level: ${data.draftLevel}`,
     data.courtType ? `Court: ${data.courtType}, ${data.courtState}` : '',
     data.courtLanguage !== 'english' ? `Language: ${data.courtLanguage}` : '',
     data.applicableLaws.length ? `Applicable Laws: ${data.applicableLaws.join(', ')}` : '',
@@ -403,9 +399,9 @@ const DraftConfig = memo(({ formData, onChange }: {
   formData: FormData; onChange: (f: keyof FormData, v: any) => void;
 }) => {
   const levels = [
-    { key: 'basic',    label: 'Basic',    pages: '~3–4 pages' },
-    { key: 'standard', label: 'Standard', pages: '~10–14 pages' },
-    { key: 'advanced', label: 'Advanced', pages: '~20–25+ pages' },
+    { key: 'basic',    label: 'Basic',    desc: 'Concise & Clear' },
+    { key: 'standard', label: 'Standard', desc: 'Detailed Draft' },
+    { key: 'advanced', label: 'Advanced', desc: 'Litigation-Grade' },
   ] as const;
 
   return (
@@ -422,7 +418,7 @@ const DraftConfig = memo(({ formData, onChange }: {
                     ? 'border-orange-400 bg-orange-50'
                     : 'border-gray-100 hover:border-orange-200 hover:bg-orange-50/30'}`}>
                 <span className="text-xs font-bold text-navy">{l.label}</span>
-                <span className="text-[10px] text-gray-400 mt-0.5">{l.pages}</span>
+                <span className="text-[10px] text-gray-400 mt-0.5">{l.desc}</span>
               </motion.button>
             ))}
           </div>
@@ -693,15 +689,10 @@ FontPreferences.displayName = 'FontPreferences';
 
 const PreviewSummary = memo(({ formData }: { formData: FormData }) => {
   const cat     = CATEGORIES.find(c => c.key === formData.category);
-  const pages   = formData.useRecommendedLength
-    ? (formData.draftLevel === 'basic' ? '3–4' : formData.draftLevel === 'standard' ? '10–14' : '20–25+')
-    : `${formData.customPageCount}`;
-
   const rows: [string, string][] = [
     ['Category',         `${cat?.emoji ?? ''} ${cat?.label ?? '—'}`],
     ['Draft Style',      formData.draftStyle.replace('_', ' ')],
     ['Draft Level',      formData.draftLevel],
-    ['Estimated Pages',  pages],
     ['Court',            [formData.courtType, formData.courtState].filter(Boolean).join(', ') || '—'],
     ['Language',         formData.courtLanguage],
     ['Applicable Laws',  formData.applicableLaws.join(', ') || '—'],
@@ -1041,6 +1032,8 @@ const RecentDraftsSidebar = memo(({ drafts, onOpen, onRename, onDelete, onFavour
                   </div>
                 </motion.div>
               ))}
+
+
             </div>
           </motion.div>
         )}
@@ -1265,6 +1258,7 @@ export const ComplaintGenerator: React.FC = () => {
   const [zoom,          setZoom]          = useState(100);
   const [fullscreen,    setFullscreen]    = useState(false);
   const [editedResult,  setEditedResult]  = useState<string | null>(null);
+  const [missingInfo,   setMissingInfo]   = useState<string | null>(null);
   // ── Backend state ──────────────────────────────────────────────────────────
   const [cases,         setCases]         = useState<CaseDocument[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string>('');
@@ -1315,10 +1309,19 @@ export const ComplaintGenerator: React.FC = () => {
     setLoading(true);
     setResult(null);
     setEditedResult(null);
+    setMissingInfo(null);
     try {
-      const text = await generateComplaintViaBackend(formData);
+      const [text, info] = await Promise.all([
+        generateComplaintViaBackend(formData),
+        generateMissingInfo({
+          category: CATEGORIES.find(c => c.key === formData.category)?.label || formData.category,
+          description: formData.description,
+          formData: formData,
+        })
+      ]);
       setResult(text);
       setEditedResult(text);
+      setMissingInfo(info);
     } catch (err) {
       console.error('Complaint generation error:', err);
       const errMsg = '⚠️ Generation failed. Please check your connection and try again.';
@@ -1344,7 +1347,7 @@ export const ComplaintGenerator: React.FC = () => {
     const sig = formData.signatureMode === 'manual'
       ? '<div style="margin-top:40px;"><div style="border-bottom:1px solid #000;width:220px;height:40px;"></div><p style="font-size:12px;margin-top:6px;">Signature</p></div>'
       : '';
-    win.document.write(`<html><head><title>LawDraft AI - Complaint</title>
+    win.document.write(`<html><head><title>PocketLawyer - Legal Draft</title>
 <style>body{font-family:${formData.fontFamily},serif;padding:48px;line-height:${formData.lineSpacing};color:#1A1A2E;max-width:800px;margin:0 auto;font-size:${formData.fontSize}pt;}
 h1,h2,h3{color:#1A1A2E;}@page{margin:${formData.margins === 'narrow' ? '1cm' : formData.margins === 'wide' ? '3cm' : '2cm'};}
 .sig{margin-top:32px;}</style></head>
@@ -1613,11 +1616,29 @@ h1,h2,h3{color:#1A1A2E;}@page{margin:${formData.margins === 'narrow' ? '1cm' : f
                   className="px-4 py-3 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all text-sm flex items-center gap-1 font-medium">
                   <Download className="h-4 w-4" /> Export
                 </button>
-                <button onClick={handleReset}
-                  className="px-4 py-3 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all text-sm">
-                  New
-                </button>
-              </div>
+                  <button onClick={handleReset}
+                    className="px-4 py-3 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all text-sm">
+                    New
+                  </button>
+                </div>
+
+                {/* Missing Information Section */}
+                {missingInfo && missingInfo !== "Unable to generate missing information section." && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-5"
+                  >
+                    <div className="flex items-center gap-2 mb-3">
+                      <AlertCircle className="h-5 w-5 text-amber-600" />
+                      <h3 className="text-sm font-bold text-amber-800">Additional Information Required</h3>
+                    </div>
+                    <div className="text-xs text-amber-900/80 prose prose-sm prose-amber max-w-none">
+                      <ReactMarkdown>{missingInfo}</ReactMarkdown>
+                    </div>
+                  </motion.div>
+                )}
+
 
               {fullscreen && (
                 <button type="button" onClick={() => setFullscreen(false)}

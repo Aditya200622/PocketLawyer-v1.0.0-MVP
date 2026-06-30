@@ -16,7 +16,7 @@ const navLinks = [
   { name: "Legal Guidance", path: '/guidance', icon: Gavel },
 
   // 🔥 MAIN FIX
-  { name: " Legal Research", path: '/research', icon: Search },
+  { name: "Legal Research", path: '/legal-research', icon: Search },
 
   { name: "My Dashboard", path: '/dashboard', icon: Scale },
   { name: "About us", path: '/about', icon: Info },

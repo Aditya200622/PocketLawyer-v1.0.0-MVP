@@ -1008,7 +1008,7 @@ export const LandingPage = () => {
   const features: FeatureCardProps[] = [
     { emoji: '📝', bgImage: '/card1.jpg', title: t('landing.features.feat1.title'), description: t('landing.features.feat1.description'), link: '/generate', index: 0 },
     { emoji: '⚖️', bgImage: '/card2.jpg', title: t('landing.features.feat2.title'), description: t('landing.features.feat2.description'), link: '/guidance', index: 1 },
-    { emoji: '🔍', bgImage: '/card3.jpg', title: t('landing.features.feat3.title'), description: t('landing.features.feat3.description'), link: '/research', index: 2 },
+    { emoji: '🔍', bgImage: '/card3.jpg', title: t('landing.features.feat3.title'), description: t('landing.features.feat3.description'), link: '/legal-research', index: 2 },
     { emoji: '🛡️', bgImage: '/card4.jpg', title: t('landing.features.feat4.title'), description: t('landing.features.feat4.description'), link: '/generate', index: 3 },
     { emoji: '💬', bgImage: '/card5.jpg', title: t('landing.features.feat5.title'), description: t('landing.features.feat5.description'), link: '/guidance', index: 4 },
   ];

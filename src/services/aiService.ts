@@ -8,7 +8,10 @@ import { db } from "../firebase";
 import { auth } from "../auth";
 import type { DocumentRecord } from "./documentService";
 
-const API_BASE = "https://pocketlawyer-backend-nh7q.onrender.com/api/ai";
+// PRODUCTION RULE: All AI requests go through Express backend only.
+// API key is in .env (server-side only). Never call AI providers directly from frontend.
+// Previously pointed to render.com remote backend — now uses local Express server (OpenRouter).
+const API_BASE = "/api/ai";
 const AI_CHATS_COLLECTION = "aiChats";
 
 export interface AiChatMessage {
@@ -132,41 +135,43 @@ export function subscribeToChatMessages(
 }
 
 export async function generateCaseAwareReply(options: CaseAwareReplyOptions): Promise<string> {
-  const { prompt, caseTitle, documents = [], conversation = [] } = options;
+  const { prompt, caseTitle, caseSummary, documents = [], conversation = [] } = options;
   const cleanedPrompt = (prompt || "").trim();
 
-  if (!documents.length) {
-    return [
-      "I can only answer from the documents attached to this case.",
-      "No case documents are loaded yet, so I cannot ground the response in this matter.",
-      "Upload or select documents for this case and I will answer strictly from them.",
-    ].join("\n\n");
-  }
-
-  const docReferences = documents
-    .slice(0, 5)
-    .map((doc, index) => `- ${doc.originalName || doc.fileName || `Document ${index + 1}`} · Page 1 reference`)
+  // Build case context string for the backend
+  const caseContext = [
+    caseTitle ? `Case Title: ${caseTitle}` : "",
+    caseSummary ? `Case Summary: ${caseSummary}` : "",
+    documents.length > 0
+      ? `Uploaded Documents (${documents.length}):\n` +
+        documents
+          .slice(0, 10)
+          .map((d, i) => `  ${i + 1}. ${d.originalName || d.fileName || "Document"} (${formatBytes(d.fileSize || 0)})`)
+          .join("\n")
+      : "No documents uploaded yet.",
+  ]
+    .filter(Boolean)
     .join("\n");
 
-  const latestUserMessage = [...conversation].reverse().find((m) => m.role === "user")?.content || cleanedPrompt;
-  // Chunking to prevent token limit errors
-  const contextPreview = documents
-    .slice(0, 3)
-    .map((doc) => `${doc.originalName || doc.fileName || "Document"} (${formatBytes(doc.fileSize || 0)})`)
-    .join(", ")
-    .substring(0, 1000);
+  // Build history for the backend (convert AiChatMessage[] to {role, content}[])
+  const history = conversation.slice(-10).map((m) => ({
+    role: m.role === "ai" ? "assistant" : "user",
+    content: m.content,
+  }));
 
-  return [
-    `Based only on the documents attached to ${caseTitle || "this case"}, here is a grounded response:`,
-    `",`,
-    `Relevant case material:`,
-    docReferences,
-    ``,
-    `Your question: ${latestUserMessage}`,
-    ``,
-    `The available evidence in this case currently points to the following: ${contextPreview || "the uploaded files"}.`,
-    `If you want a deeper analysis, add more documents or ask for a specific section, page, or issue.`,
-  ].join("\n");
+  try {
+    const res = await fetch(`${API_BASE}/chat-case`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: cleanedPrompt, caseContext, history }),
+    });
+    if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+    const data = await res.json() as { reply?: string };
+    return data.reply || "No response from AI. Please try again.";
+  } catch (error) {
+    console.error("generateCaseAwareReply error:", error);
+    return "AI counsel is temporarily unavailable. Please retry in a moment.";
+  }
 }
 
 export async function loadResearchSessions(caseId?: string): Promise<ResearchSessionRecord[]> {
@@ -227,39 +232,127 @@ export async function deleteResearchSession(sessionId: string): Promise<boolean>
 }
 
 export async function generateResearchResponse(options: ResearchResponseOptions): Promise<{ response: string; references: string[] }> {
-  const { prompt, caseTitle, documents = [] } = options;
+  const { prompt, caseTitle, documents = [], conversation = [] } = options;
   const cleanedPrompt = (prompt || "").trim();
 
-  if (!documents.length) {
+  // Build history for the backend
+  const history = (conversation || []).slice(-8).map((m) => ({
+    role: m.role === "ai" ? "assistant" : "user",
+    content: m.content,
+  }));
+
+  try {
+    const res = await fetch(`${API_BASE}/research-response`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: cleanedPrompt, caseTitle, history }),
+    });
+    if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+    const data = await res.json() as { content?: string };
+    const response = data.content || "No research response. Please try again.";
+
+    // Extract references from document list for citation display
+    const references = documents.slice(0, 6).map((doc, index) =>
+      `[${index + 1}] ${doc.originalName || doc.fileName || "Document"}`
+    );
+
+    return { response, references };
+  } catch (error) {
+    console.error("generateResearchResponse error:", error);
     return {
-      response: [
-        "I can only research from the documents attached to the selected case.",
-        "No documents are loaded for this case yet, so I cannot produce a grounded research summary.",
-      ].join("\n\n"),
+      response: "Research AI is temporarily unavailable. Please retry in a moment.",
       references: [],
     };
   }
+}
 
-  const references = documents.slice(0, 6).map((doc, index) => `Document ${index + 1}: ${doc.originalName || doc.fileName || "Attached document"} — Page 1 reference`);
-  const context = documents
-    .slice(0, 4)
-    .map((doc, index) => `${index + 1}. ${doc.originalName || doc.fileName || "Document"} (${formatBytes(doc.fileSize || 0)})`)
-    .join("\n");
+// ─── New helper: analyze full case context (used by AI Assistant) ──────────────
+export async function analyzeCaseContext(params: {
+  caseTitle?: string;
+  caseType?: string;
+  caseSummary?: string;
+  documents?: DocumentRecord[];
+  hearings?: unknown[];
+  researchSessions?: unknown[];
+}): Promise<string> {
+  try {
+    const res = await fetch(`${API_BASE}/analyze-case`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+    const data = await res.json() as { analysis?: string };
+    return data.analysis || "Case analysis unavailable.";
+  } catch (error) {
+    console.error("analyzeCaseContext error:", error);
+    return "Case analysis temporarily unavailable. Please retry.";
+  }
+}
 
-  return {
-    response: [
-      `Based only on the uploaded documents for ${caseTitle || "the selected case"}, here is a grounded research summary:`,
-      ``,
-      `Prompt: ${cleanedPrompt || "Research request"}`,
-      ``,
-      `Key evidence reviewed:`,
-      context,
-      ``,
-      `The documents indicate that the matter should be analysed around the core facts, attached exhibits, and the relevant filing history.`,
-      `If you want a deeper draft, add more documents or ask for a narrower issue such as a specific legal point or section.`,
-    ].join("\n"),
-    references,
-  };
+// ─── New helper: generate missing information section ─────────────────────────
+export async function generateMissingInfo(params: {
+  category: string;
+  description: string;
+  formData?: unknown;
+}): Promise<string> {
+  try {
+    const res = await fetch(`${API_BASE}/missing-info`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+    const data = await res.json() as { content?: string };
+    return data.content || "Unable to generate missing information section.";
+  } catch (error) {
+    console.error("generateMissingInfo error:", error);
+    return "Missing information analysis temporarily unavailable.";
+  }
+}
+
+// ─── New helper: legal guidance chat (continuous conversation) ─────────────────
+export async function sendLegalGuidanceChat(params: {
+  message: string;
+  issueType?: string;
+  history?: { role: string; content: string }[];
+}): Promise<string> {
+  try {
+    const res = await fetch(`${API_BASE}/legal-guidance-chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+    const data = await res.json() as { content?: string };
+    return data.content || "No response. Please try again.";
+  } catch (error) {
+    console.error("sendLegalGuidanceChat error:", error);
+    return "Legal guidance AI is temporarily unavailable. Please retry.";
+  }
+}
+
+// ─── New helper: moot court API ──────────────────────────────────────────────
+export async function callMootCourt(params: {
+  role: "judge" | "opposing_counsel" | "final_order";
+  caseTitle?: string;
+  caseType?: string;
+  userArgument?: string;
+  exchangeHistory?: unknown[];
+  roundNumber?: number;
+}): Promise<Record<string, unknown>> {
+  try {
+    const res = await fetch(`${API_BASE}/moot-court`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+    return await res.json() as Record<string, unknown>;
+  } catch (error) {
+    console.error("callMootCourt error:", error);
+    return { error: "Moot court AI temporarily unavailable." };
+  }
 }
 
 export const aiService = {
@@ -397,6 +490,8 @@ export const aiService = {
       return "🤖 AI: Server issue aa raha hai, please dobara try karein.";
     }
   },
+  sendLegalGuidanceChat,
+  analyzeCaseContext,
 };
 export async function fetchAIResponse(prompt: string, signal?: AbortSignal): Promise<string> {
   try {

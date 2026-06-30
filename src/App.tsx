@@ -12,6 +12,7 @@ import { Dashboard } from './pages/Dashboard';
 import { AuthPage } from './pages/AuthPage';
 import { AboutPage } from './pages/AboutPage';
 import Research from './pages/Research';
+import PublicResearch from './pages/PublicResearch';
 import AiAssistant from './pages/AiAssistant';
 
 const MetadataUpdater = () => {
@@ -57,6 +58,9 @@ export default function App() {
 
         {/* Legal Guidance */}
         <Route path="/guidance" element={<LegalGuidance />} />
+
+        {/* Public Legal Research */}
+        <Route path="/legal-research" element={<PublicResearch />} />
 
         {/* Protected: Dashboard */}
         <Route

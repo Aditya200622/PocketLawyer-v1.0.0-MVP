@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { getDocuments, type DocumentRecord } from "../services/documentService";
 import { aiService, type AiChatMessage } from "../services/aiService";
 import { auth } from "../firebase";
+import ReactMarkdown from "react-markdown";
 import {
   Scale,
   Send,
@@ -633,11 +634,17 @@ const ContextPanel = ({
   evidence,
   research,
   drafts,
+  strategyAnalysis,
+  analyzingCase,
+  onAnalyzeCase,
 }: {
   activeCase: Case | null;
   evidence: Evidence[];
   research: ResearchItem[];
   drafts: DraftItem[];
+  strategyAnalysis: string | null;
+  analyzingCase: boolean;
+  onAnalyzeCase: () => void;
 }) => {
   if (!activeCase) {
     return (
@@ -806,6 +813,33 @@ const ContextPanel = ({
         )}
       </ContextSection>
 
+      <ContextSection label="Senior Counsel Brief" icon={<Gavel size={13} />}>
+        {analyzingCase ? (
+          <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-[#FF7A1A]" />
+            Analyzing case files...
+          </div>
+        ) : strategyAnalysis ? (
+          <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 max-h-[300px] overflow-y-auto hide-scrollbar text-[11px] leading-relaxed text-slate-700">
+            <ReactMarkdown>{strategyAnalysis}</ReactMarkdown>
+            <button
+              onClick={onAnalyzeCase}
+              className="mt-3 w-full flex items-center justify-center gap-1 py-1 bg-white border border-slate-200 hover:bg-slate-50 text-[10px] font-semibold text-[#FF7A1A] rounded-lg transition-colors cursor-pointer"
+            >
+              Recalculate Brief
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={onAnalyzeCase}
+            className="w-full flex items-center justify-center gap-1.5 text-[11.5px] font-semibold text-[#FF7A1A] border border-dashed border-[#FFB366] rounded-xl px-3 py-2 hover:bg-[#FFF7ED] transition-colors cursor-pointer"
+          >
+            <Sparkles size={12} />
+            Generate Strategy Brief
+          </button>
+        )}
+      </ContextSection>
+
       <ContextSection label="AI Context" icon={<Sparkles size={13} />}>
         <p className="text-[11px] text-slate-400 leading-relaxed">
           The assistant is using this case's details and {evidence.length} evidence item{evidence.length === 1 ? "" : "s"} to ground its answers.
@@ -897,6 +931,32 @@ export const AiAssistant: React.FC<Props> = ({
   const [rightOpen, setRightOpen] = useState(false);
   const [showContext, setShowContext] = useState(true);
   const [lang, setLang] = useState<"auto" | "en" | "hi">("auto");
+  const [strategyAnalysis, setStrategyAnalysis] = useState<string | null>(null);
+  const [analyzingCase, setAnalyzingCase] = useState(false);
+
+  const runStrategyAnalysis = async () => {
+    if (!activeCase) return;
+    setAnalyzingCase(true);
+    try {
+      const result = await aiService.analyzeCaseContext({
+        caseTitle: activeCase.title,
+        caseType: activeCase.type,
+        caseSummary: activeCase.description,
+        documents: caseDocuments,
+      });
+      setStrategyAnalysis(result);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to analyze case strategy. Please try again.");
+    } finally {
+      setAnalyzingCase(false);
+    }
+  };
+
+  useEffect(() => {
+    setStrategyAnalysis(null);
+  }, [activeCase]);
+
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -1159,7 +1219,15 @@ export const AiAssistant: React.FC<Props> = ({
       {/* ── Desktop Right Panel: Case Context & AI Tools (20%) ── */}
       {showContext && (
         <aside className="hidden lg:flex lg:w-[20%] lg:min-w-[240px] lg:max-w-[300px] flex-col bg-white border-l border-slate-100 flex-shrink-0">
-          <ContextPanel activeCase={activeCase} evidence={evidence} research={research} drafts={drafts} />
+          <ContextPanel 
+            activeCase={activeCase} 
+            evidence={evidence} 
+            research={research} 
+            drafts={drafts} 
+            strategyAnalysis={strategyAnalysis}
+            analyzingCase={analyzingCase}
+            onAnalyzeCase={runStrategyAnalysis}
+          />
         </aside>
       )}
 
@@ -1176,7 +1244,15 @@ export const AiAssistant: React.FC<Props> = ({
               <X size={16} />
             </button>
             <div className="pt-2">
-              <ContextPanel activeCase={activeCase} evidence={evidence} research={research} drafts={drafts} />
+              <ContextPanel 
+                activeCase={activeCase} 
+                evidence={evidence} 
+                research={research} 
+                drafts={drafts} 
+                strategyAnalysis={strategyAnalysis}
+                analyzingCase={analyzingCase}
+                onAnalyzeCase={runStrategyAnalysis}
+              />
             </div>
           </div>
         </div>
