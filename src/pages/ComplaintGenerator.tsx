@@ -1432,9 +1432,9 @@ h1,h2,h3{color:#1A1A2E;}@page{margin:${formData.margins === 'narrow' ? '1cm' : f
       case 'copy':    copyToClipboard(); break;
       case 'print':   handlePrint(); break;
       case 'ai_improve':
-        if (editedResult) setEditedResult(prev => (prev ?? '') + '\n\n[AI Improve: connect to /api/ai/improve for this feature]'); break;
+        if (editedResult) setEditedResult(prev => (prev ?? '') + `\n\n[AI Improve: connect to ${import.meta.env.VITE_API_URL || "https://pocketlawyer-v100-mvp-production.up.railway.app"}/api/ai/improve for this feature]`); break;
       case 'ai_expand':
-        if (editedResult) setEditedResult(prev => (prev ?? '') + '\n\n[AI Expand: connect to /api/ai/expand for this feature]'); break;
+        if (editedResult) setEditedResult(prev => (prev ?? '') + `\n\n[AI Expand: connect to ${import.meta.env.VITE_API_URL || "https://pocketlawyer-v100-mvp-production.up.railway.app"}/api/ai/expand for this feature]`); break;
       case 'ai_shorten':
         if (editedResult) setEditedResult(prev => prev ? prev.split('\n').filter((_,i) => i % 2 === 0).join('\n') : null); break;
       default: break;

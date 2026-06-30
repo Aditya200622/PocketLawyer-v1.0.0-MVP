@@ -2,7 +2,7 @@
  * AI Service for PocketLawyer
  * Handles all AI-related API calls
  */
-
+import { API_BASE_URL } from "../config/api";
 import { collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc, where } from "firebase/firestore";
 import { db } from "../firebase";
 import { auth } from "../auth";
@@ -11,8 +11,7 @@ import type { DocumentRecord } from "./documentService";
 // PRODUCTION RULE: All AI requests go through Express backend only.
 // API key is in .env (server-side only). Never call AI providers directly from frontend.
 // Previously pointed to render.com remote backend — now uses local Express server (OpenRouter).
-const API_BASE =
-  "https://pocketlawyer-v100-mvp-production.up.railway.app/api/ai";
+const API_BASE = API_BASE_URL + "/api/ai";
 const AI_CHATS_COLLECTION = "aiChats";
 
 export interface AiChatMessage {
@@ -243,12 +242,10 @@ export async function generateResearchResponse(options: ResearchResponseOptions)
   }));
 
   try {
-    const res = await fetch(
-  "https://pocketlawyer-v100-mvp-production.up.railway.app/api/ai/research-response",
-  {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
+    const res = await fetch(`${API_BASE}/research-response`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
     },
     body: JSON.stringify({
       prompt: cleanedPrompt,

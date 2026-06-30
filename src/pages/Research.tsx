@@ -57,7 +57,8 @@ interface ClientFilters {
    CONSTANTS  (API_URL, STEPS, and the filtering flow are unchanged)
    ========================================================================== */
 
-const API_URL = "/api/ai/case-research";
+import { API_BASE_URL } from "../config/api";
+const API_URL = `${API_BASE_URL}/api/ai/case-research`;
 
 const STEPS = [
   {
