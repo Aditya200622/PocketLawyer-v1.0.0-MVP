@@ -118,6 +118,12 @@ const gateway = new OpenRouterGatewayManager();
 
 async function startServer() {
   const app = express();
+  app.get("/api/test", (req, res) => {
+  res.json({
+    success: true,
+    message: "Backend is working"
+  });
+});
   const PORT = 3001;
   app.use(cors());
   app.use(express.json({ limit: "10mb" }));
