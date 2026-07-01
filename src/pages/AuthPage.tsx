@@ -287,16 +287,9 @@ export const AuthPage = () => {
   const navigate = useNavigate();
 
   const doSignup = async () => {
-    try {
-      if (!signupForm.email || !signupForm.password) { alert('Please fill all fields'); return; }
-      const userCred = await signup(signupForm.email, signupForm.password);
-      await setDoc(doc(db, 'users', userCred.user.uid), {
-        email: userCred.user.email, name: signupForm.name || 'New User', createdAt: new Date(),
-      });
-      alert('Account created 🚀');
-      setAuthTab('login');
-    } catch (err: any) { alert(err.message); }
-  };
+  alert("🚫 New registrations are currently closed. Please contact the administrator.");
+  return;
+};
 
   const doLogin = async () => {
     try {
